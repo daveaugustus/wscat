@@ -1,8 +1,8 @@
-# WebSocket Client in Go
+# (wscat)WebSocket Client in Go
 
 ## Overview
-
-This project is a WebSocket client implemented in Go. It uses the Gorilla WebSocket package and Cobra for command-line interface. The client can establish a WebSocket connection to a server, send messages, and receive messages.
+![alt text](document\wsock_logo.png?raw=true)
+This project <b>wscat</b> is a WebSocket client implemented in Go. It uses the Gorilla WebSocket package and Cobra for command-line interface. The client can establish a WebSocket connection to a server, send messages, and receive messages.
 
 ## How to Build and Use the Client
 
