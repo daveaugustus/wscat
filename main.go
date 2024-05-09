@@ -1,60 +1,135 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	// Replace with the actual websocket server URL
-	u := "wss://localhost:8080/api/v1/blog/draft/6564321"
+var (
+	endpoint string
+	headers  map[string]string
+	conn     *websocket.Conn
+	rootCmd  = &cobra.Command{
+		Use:   "ws-client",
+		Short: "Golang websocket client with Cobra",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return connectAndRun()
+		},
+	}
+)
 
-	headers := http.Header{}
-	headers.Set("Authorization", "Bearer ajd123bnsdjbcbbdbfrb2e89we89cksdbcdsbcbd")
+func init() {
+	rootCmd.Flags().StringVarP(&endpoint, "endpoint", "e", "", "Websocket server endpoint URL")
+	rootCmd.Flags().StringToStringVarP(&headers, "headers", "H", nil, "Headers (key=value format)")
+	_ = rootCmd.MarkFlagRequired("endpoint") // Mark endpoint flag as required
+}
 
-	// Connect to the websocket server
-	conn, _, err := websocket.DefaultDialer.Dial(u, headers)
+func connectAndRun() error {
+	// Establish websocket connection
+	var err error
+	conn, _, err = websocket.DefaultDialer.Dial(endpoint, parseHeaders(headers))
 	if err != nil {
-		log.Fatal("dial:", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer conn.Close()
 
-	fmt.Println("Connected to the websocket server")
+	fmt.Println("WebSocket connection established successfully")
 
-	// Define the message to send
-	message := `
-	{
-		"time": 1278687357,
-		"blocks": [
-			{
-				"id": "mhTl6ghSkV",
-				"type": "paragraph",
-				"data": {
-					"text": "Hey. Meet the new Editor. On this picture you can see it in action. Then, try a demo 🤓"
-				},
-				"author": "John",
-				"time": 17107371588
+	// Handle CTRL+C to close connection gracefully
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt)
+	go func() {
+		<-ch
+		cancel()
+		conn.Close()
+	}()
+
+	// Create a WaitGroup to wait for goroutines to finish
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine for sending data
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("Send routine stopped due to context cancellation")
+				return
+			default:
+				message := readUserInput()
+				if message == "exit" {
+					cancel()
+					return
+				}
+				err := conn.WriteMessage(websocket.TextMessage, []byte(message))
+				if err != nil {
+					fmt.Println("write error:", err)
+					cancel()
+					return
+				}
 			}
-		]
-	}
-	`
+		}
+	}()
 
-	// Send the message
-	err = conn.WriteMessage(websocket.TextMessage, []byte(message))
-	if err != nil {
-		log.Println("write:", err)
-		return
-	}
+	// Goroutine for receiving data
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("Receive routine stopped due to context cancellation")
+				return
+			default:
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+						fmt.Println("connection closed")
+					} else {
+						fmt.Println("read error:", err)
+					}
+					cancel()
+					return
+				}
+				fmt.Println("Received from server:", string(message))
+			}
+		}
+	}()
 
-	// Read any incoming messages (optional)
-	_, msg, err := conn.ReadMessage()
-	if err != nil {
-		log.Println("read:", err)
-		return
-	}
+	// Wait for routines to finish
+	wg.Wait()
+	return nil
+}
 
-	fmt.Printf("Received from server: %s\n", msg)
+func readUserInput() string {
+	fmt.Print("Enter message (or 'exit' to quit): ")
+	reader := bufio.NewReader(os.Stdin)
+	message, _ := reader.ReadString('\n')
+	return strings.TrimSpace(message)
+}
+
+func parseHeaders(headers map[string]string) http.Header {
+	headerMap := http.Header{}
+	for key, value := range headers {
+		headerMap.Add(key, value)
+	}
+	return headerMap
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
