@@ -8,7 +8,7 @@ This project is a WebSocket client implemented in Go. It uses the Gorilla WebSoc
 
 1. **Download the Release**
 
-You can download the latest release of this project from the releases page. There are source code archives available in ZIP and TAR formats.
+    You can download the latest release of this project from the releases page. There are source code archives available in ZIP and TAR formats.
 
 
 2. **Build the Client**
