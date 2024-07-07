@@ -43,7 +43,7 @@ func connectAndRun() error {
 	defer conn.Close()
 
 	fmt.Println("WebSocket connection established successfully")
-
+	fmt.Print("\nEnter message (or 'exit' to quit): ")
 	// Handle CTRL+C to close connection gracefully
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -59,6 +59,13 @@ func connectAndRun() error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// Channel to control when the user can send messages
+	canSend := make(chan bool, 1)
+	canSend <- true // Initially, allow sending
+
+	// Channel to notify the main routine to prompt the user
+	promptChan := make(chan struct{})
+
 	// Goroutine for sending data
 	go func() {
 		defer wg.Done()
@@ -67,7 +74,7 @@ func connectAndRun() error {
 			case <-ctx.Done():
 				fmt.Println("Send routine stopped due to context cancellation")
 				return
-			default:
+			case <-canSend:
 				message := readUserInput()
 				if message == "exit" {
 					cancel()
@@ -79,6 +86,8 @@ func connectAndRun() error {
 					cancel()
 					return
 				}
+				// Disable sending until a response is received
+				canSend <- false
 			}
 		}
 	}()
@@ -103,7 +112,17 @@ func connectAndRun() error {
 					return
 				}
 				fmt.Println("Received from server:", string(message))
+				// Notify to prompt user
+				promptChan <- struct{}{}
 			}
+		}
+	}()
+
+	// Prompt user after receiving data
+	go func() {
+		for range promptChan {
+			fmt.Print("\nEnter message (or 'exit' to quit): ") // Print a newline before the prompt
+			canSend <- true                                    // Allow sending after receiving a response
 		}
 	}()
 
@@ -113,7 +132,6 @@ func connectAndRun() error {
 }
 
 func readUserInput() string {
-	fmt.Print("Enter message (or 'exit' to quit): ")
 	reader := bufio.NewReader(os.Stdin)
 	message, _ := reader.ReadString('\n')
 	return strings.TrimSpace(message)
