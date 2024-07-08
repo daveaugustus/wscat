@@ -26,8 +26,18 @@ This project <b>wscat</b> is a WebSocket client implemented in Go. It uses the G
     To use the client, you need to run the executable with the `--endpoint` flag set to your WebSocket server URL and the `--headers` flag set to your headers. Here's an example:
 
     ```bash
-    ./main --endpoint "wss://localhost:8080/api/v1/blog/draft/6564321" --headers "Authorization=Bearer ShD21O3OcsWdYo8Z68Zrmui4cbRrKv9Kpz4hY5M6Tc4ZXYWKRLFKqa7lZ0bPzjyU"
+    ./main run-client --endpoint "wss://localhost:8080/api/v1/blog/draft/6564321" --headers "Authorization=Bearer ShD21O3OcsWdYo8Z68Zrmui4cbRrKv9Kpz4hY5M6Tc4ZXYWKRLFKqa7lZ0bPzjyU"
     ```
 
     You can then enter messages at the prompt to send them to the server. Enter 'exit' to quit the client.
 
+
+4. ** Start server **
+    To start a dummy server for testing the client, you can simply run the following command
+    ```bash
+    go run main.go start-server
+    ```
+    or
+    ```bash
+    ./main start-server
+    ```
