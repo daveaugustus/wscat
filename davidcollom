@@ -1,4 +1,4 @@
-module github.com/daveaugustus/wscli
+module github.com/daveaugustus/wscat
 
 go 1.21.7
 
